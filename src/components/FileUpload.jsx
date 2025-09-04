@@ -1,19 +1,32 @@
 import React from 'react';
 import { UploadCloud } from 'lucide-react';
-import Papa from 'papaparse'; // 2. Import Papa Parse
+import axios from 'axios';
 
-function FileUpload({ setParsedData }) {
-
-  const handleFileChange = (event) => {
+function FileUpload({onUploadSuccess}) {
+  const handleFileChange = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      Papa.parse(file, {
-        header: true, // Tells Papa Parse to use the first row as headers
-        complete: (results) => {
-          console.log("Parsing complete:", results.data);
-          setParsedData(results.data);
+    if (!file) {
+      return; // No file selected
+    }
+
+    // Create a FormData object to send the file
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // Send the file to the FastAPI backend endpoint
+      const response = await axios.post("http://127.0.0.1:8000/uploadfile/", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
         },
       });
+
+      // Log the server's response to the console to confirm success
+      console.log('File uploaded successfully:', response.data);
+      onUploadSuccess();
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
     }
   };
 

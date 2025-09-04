@@ -7,8 +7,12 @@ import FileUpload from './components/FileUpload.jsx'
 import TransactionTable from './components/TransactionTable';
 
 function App() {
-  const [parsedData, setParsedData] = useState([]);
+  const [fileUploadCount, setFileUploadCount] = useState(0);
   const [backendMessage, setBackendMessage] = useState("");
+
+  const handleUploadSuccess = () => {
+    setFileUploadCount(prevCount => prevCount + 1);
+  };
 
   useEffect(() => {
     // We use an async function inside useEffect to handle the request
@@ -57,14 +61,12 @@ function App() {
           {/* Transactions Area - takes up 1 column */}
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold text-gray-700">Import Data</h3>
-            <FileUpload setParsedData={setParsedData}/>
+          <FileUpload onUploadSuccess={handleUploadSuccess} />
           </div>
 
         </main>
 
-        {parsedData.length > 0 && (
-        <TransactionTable data={parsedData} />
-        )}
+        <TransactionTable />
 
       </div>
     </div>
