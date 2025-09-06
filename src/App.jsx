@@ -4,6 +4,7 @@ import './App.css'
 import { useState,useEffect } from 'react';
 import axios from 'axios';
 import FileUpload from './components/FileUpload.jsx'
+import AccountManager from './components/AccountManager';
 import TransactionTable from './components/TransactionTable';
 
 function App() {
@@ -66,7 +67,9 @@ function App() {
 
         </main>
 
-        <TransactionTable />
+        <AccountManager />
+
+        <TransactionTable key={fileUploadCount} />
 
       </div>
     </div>

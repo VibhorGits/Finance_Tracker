@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from pymongo import MongoClient
 from bson import ObjectId
+from pydantic import BaseModel
 import json
 import io
 
@@ -11,6 +12,10 @@ class JSONEncoder(json.JSONEncoder):
         if isinstance(o, ObjectId):
             return str(o)
         return json.JSONEncoder.default(self, o)
+    
+class Account(BaseModel):
+    account_name: str
+    account_type: str
 
 # --- Database Connection ---
 connection_string = "mongodb+srv://Cluster12390:fU9EeUF7THNx@cluster12390.fzv363x.mongodb.net/?retryWrites=true&w=majority"
@@ -43,12 +48,34 @@ def read_root():
     # This function will run when a user visits the main URL
     return {"message": "Hello from the FastAPI Backend!"}
 
+# Add the endpoint to create a new account
+@app.post("/accounts/")
+def create_account(account: Account):
+    # Convert the pydantic model to a dictionary
+    account_data = account.dict()
+    # For now, we'll add a placeholder user_id
+    # We will replace this with a real one when we add authentication
+    account_data['user_id'] = "placeholder_user" 
+    
+    # Insert the new account into the 'accounts' collection
+    db.accounts.insert_one(account_data)
+    return {"status": "success", "message": "Account created successfully."}
+
+# Add the endpoint to fetch all accounts
+@app.get("/accounts/")
+def get_accounts():
+    accounts = []
+    for doc in db.accounts.find({"user_id": "placeholder_user"}): # Find only for our placeholder user
+        doc['_id'] = str(doc['_id'])
+        accounts.append(doc)
+    return accounts
+
 # Add this new endpoint to fetch all transactions
 @app.get("/transactions/")
 def get_transactions():
     transactions = []
     # Find all documents in the collection
-    for doc in collection.find({}):
+    for doc in collection.find({"user_id","placeholder_user"}):
         # Convert the ObjectId to a string so it can be sent as JSON
         doc['_id'] = str(doc['_id'])
         transactions.append(doc)
