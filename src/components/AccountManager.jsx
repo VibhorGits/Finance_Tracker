@@ -1,25 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
-function AccountManager() {
-  const [accounts, setAccounts] = useState([]);
+function AccountManager({accounts = [], onAccountCreated}) {
   const [accountName, setAccountName] = useState('');
   const [accountType, setAccountType] = useState('');
-
-  // Function to fetch all existing accounts
-  const fetchAccounts = async () => {
-    try {
-      const response = await axios.get("http://127.0.0.1:8000/accounts/");
-      setAccounts(response.data);
-    } catch (error) {
-      console.error("Error fetching accounts:", error);
-    }
-  };
-
-  // Use useEffect to fetch accounts when the component first loads
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
 
   // Function to handle the form submission
   const handleCreateAccount = async (e) => {
@@ -36,7 +20,7 @@ function AccountManager() {
       // Clear the form fields and refresh the account list
       setAccountName('');
       setAccountType('');
-      fetchAccounts(); 
+      onAccountCreated(); 
     } catch (error) {
       console.error("Error creating account:", error);
     }

@@ -10,9 +10,28 @@ import TransactionTable from './components/TransactionTable';
 function App() {
   const [fileUploadCount, setFileUploadCount] = useState(0);
   const [backendMessage, setBackendMessage] = useState("");
+  const [accounts, setAccounts] = useState([]);
+  const [viewingAccount, setViewingAccount] = useState('');
 
-  const handleUploadSuccess = () => {
+  const fetchAccounts = async () => {
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/accounts/");
+      setAccounts(response.data);
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+
+  const handleUploadSuccess = (uploadedAccountId) => {
     setFileUploadCount(prevCount => prevCount + 1);
+    if (uploadedAccountId) {
+    setViewingAccount(uploadedAccountId); // Switch view to uploaded account
+  }
   };
 
   useEffect(() => {
@@ -32,6 +51,22 @@ function App() {
     fetchMessage();
   }, []); // The empty array [] means this effect runs only once when the component mounts
 
+  // In the useEffect that fetches accounts, set a default viewing account
+  useEffect(() => {
+    const fetchAndSetAccounts = async () => {
+      try {
+        const response = await axios.get("http://127.0.0.1:8000/accounts/");
+        setAccounts(response.data);
+        // If we don't have a viewing account set yet, default to the first one
+        if (response.data.length > 0 && viewingAccount === '') {
+          setViewingAccount(response.data[0]._id);
+        }
+      } catch (error) {
+        console.error("Error fetching accounts:", error);
+      }
+    };
+    fetchAndSetAccounts();
+  }, [fileUploadCount]); // We can also make this re-run on upload
 
   return (
     // Set a background color for the whole page and ensure it's at least the full screen height
@@ -62,15 +97,35 @@ function App() {
           {/* Transactions Area - takes up 1 column */}
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold text-gray-700">Import Data</h3>
-          <FileUpload onUploadSuccess={handleUploadSuccess} />
+            <FileUpload onUploadSuccess={handleUploadSuccess} accounts={accounts} />
           </div>
 
         </main>
 
-        <AccountManager />
+        <AccountManager onAccountCreated={fetchAccounts} accounts={accounts} />
 
-        <TransactionTable key={fileUploadCount} />
+        <div className="bg-white p-6 rounded-lg shadow-md mt-6">
+          <label htmlFor="view-account-select" className="block text-sm font-medium text-gray-700 mb-1">
+            Viewing Transactions for Account:
+          </label>
+          <select
+            id="view-account-select"
+            value={viewingAccount}
+            onChange={(e) => setViewingAccount(e.target.value)}
+            className="block w-full p-2 border border-gray-300 rounded-md"
+          >
+            {accounts.map(acc => (
+              <option key={acc._id} value={acc._id}>
+                {acc.account_name}
+              </option>
+            ))}
+          </select>
+        </div>
 
+        <TransactionTable
+          key={`${viewingAccount}-${fileUploadCount}`}
+          accountId={viewingAccount}
+        />
       </div>
     </div>
   )
