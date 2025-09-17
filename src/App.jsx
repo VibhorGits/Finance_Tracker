@@ -36,6 +36,8 @@ function App() {
 
   // Use environment variable for API base URL
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  console.log("DEBUG: VITE_API_BASE_URL =", import.meta.env.VITE_API_BASE_URL)
+  console.log("DEBUG: API_BASE_URL =", API_BASE_URL)
 
   const fetchAccounts = async () => {
     try {
@@ -100,8 +102,8 @@ function App() {
           </div>
           <div className="ml-3">
             <p className="text-sm text-amber-700">
-              <strong>Backend Offline:</strong> The FastAPI backend at <code>http://127.0.0.1:8000</code> is not
-              running. Start your backend server to enable full functionality.
+              <strong>Backend Offline:</strong> Cannot connect to API at <code>{API_BASE_URL || 'undefined'}</code>.
+              Check your VITE_API_BASE_URL environment variable in Vercel.
             </p>
           </div>
         </div>
