@@ -1,55 +1,93 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+"use client"
+
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { Repeat } from "lucide-react" // Fixed import to use lucide-react
 
 function SubscriptionList({ accountId }) {
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [subscriptions, setSubscriptions] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId) return
 
     const fetchSubscriptions = async () => {
-      setLoading(true);
+      setLoading(true)
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/analytics/subscriptions/${accountId}`);
-        setSubscriptions(response.data);
+        const response = await axios.get(`http://127.0.0.1:8000/analytics/subscriptions/${accountId}`)
+        setSubscriptions(response.data)
       } catch (error) {
-        console.error("Error fetching subscriptions:", error);
-        setSubscriptions([]);
+        console.error("Error fetching subscriptions:", error)
+        setSubscriptions([])
       }
-      setLoading(false);
-    };
+      setLoading(false)
+    }
 
-    fetchSubscriptions();
-  }, [accountId]);
+    fetchSubscriptions()
+  }, [accountId])
 
   if (loading) {
-    return <div className="bg-white p-6 rounded-lg shadow-md">Loading subscriptions...</div>;
+    return (
+      <div className="bg-white/70 backdrop-blur-sm p-8 rounded-2xl border border-gray-200/50 shadow-sm">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 bg-gray-200 rounded w-1/3"></div>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-xl font-semibold text-gray-700 mb-4">Recurring Subscriptions</h3>
+    <div className="bg-white/70 backdrop-blur-sm p-8 rounded-2xl border border-gray-200/50 shadow-sm">
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Recurring Subscriptions</h3>
       {subscriptions.length === 0 ? (
-        <p className="text-gray-500">No recurring subscriptions detected for this account.</p>
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <Repeat className="w-8 h-8 text-gray-400" />
+          </div>
+          <h4 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h4>
+          <p className="text-gray-600">No recurring subscriptions detected for this account.</p>
+        </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm text-left text-gray-500">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+          <table className="w-full">
+            <thead className="bg-gray-50/50">
               <tr>
-                <th scope="col" className="px-6 py-3">Merchant</th>
-                <th scope="col" className="px-6 py-3">Transaction Count</th>
-                <th scope="col" className="px-6 py-3 text-right">Average Amount</th>
-                <th scope="col" className="px-6 py-3">Last Payment Date</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Merchant
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Transaction Count
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Average Amount
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Last Payment Date
+                </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200/50">
               {subscriptions.map((sub, index) => (
-                <tr key={index} className="bg-white border-b hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium text-gray-900">{sub.merchant}</td>
-                  <td className="px-6 py-4">{sub.transaction_count}</td>
-                  <td className="px-6 py-4 text-right font-medium text-gray-900">₹{Math.abs(sub.avg_amount).toFixed(2)}</td>
-                  <td className="px-6 py-4">{new Date(sub.last_payment_date).toLocaleDateString()}</td>
+                <tr key={index} className="hover:bg-gray-50/50 transition-colors duration-150">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-gray-900">{sub.merchant}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-900">{sub.transaction_count}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <span className="text-sm font-bold text-red-600">₹{Math.abs(sub.avg_amount).toFixed(2)}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-900">
+                      {new Date(sub.last_payment_date).toLocaleDateString()}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -57,7 +95,7 @@ function SubscriptionList({ accountId }) {
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default SubscriptionList;
+export default SubscriptionList

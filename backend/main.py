@@ -189,6 +189,37 @@ def get_accounts():
         doc['_id'] = str(doc['_id'])
         accounts.append(doc)
     return accounts
+@app.patch("/accounts/{account_id}")
+def update_account(account_id: str, account: Account):
+    # Convert the pydantic model to a dictionary
+    account_data = account.dict()
+    # Update the account in the 'accounts' collection
+    result = db.accounts.update_one(
+        {'_id': ObjectId(account_id)},
+        {'$set': account_data}
+    )
+
+    # Check if a document was successfully updated
+    if result.modified_count == 1:
+        return {"status": "success", "message": "Account updated successfully."}
+    else:
+        # If no document was found with that ID, return an error
+        return {"status": "error", "message": "Account not found."}
+
+@app.delete("/accounts/{account_id}")
+def delete_account(account_id: str):
+    # Delete the account from the 'accounts' collection
+    account_result = db.accounts.delete_one({'_id': ObjectId(account_id)})
+    # Delete associated transactions from the 'transactions' collection
+    transaction_result = collection.delete_many({'account_id': account_id})
+
+    # Check if the account was successfully deleted
+    if account_result.deleted_count == 1:
+        return {"status": "success", "message": f"Account and {transaction_result.deleted_count} associated transactions deleted successfully."}
+    else:
+        # If no document was found with that ID, return an error
+        return {"status": "error", "message": "Account not found."}
+
 
 # --- Analytics Endpoint ---
 @app.get("/analytics/summary/{account_id}")
@@ -541,7 +572,7 @@ def handle_ai_query(account_id: str, query: AIQuery):
     transactions = list(collection.find(
         {'account_id': account_id, 'user_id': 'placeholder_user'},
         sort=[('Date', -1)],
-        limit=20
+        limit=40
     ))
 
     if not transactions:

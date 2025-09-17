@@ -1,1 +1,109 @@
 @import "tailwindcss";
+
+/* Adding comprehensive design system with semantic tokens */
+:root {
+  /* Core Colors */
+  --background: #ffffff;
+  --foreground: #374151;
+  --card: #f0fdf4;
+  --card-foreground: #374151;
+  --popover: #ffffff;
+  --popover-foreground: #374151;
+
+  /* Brand Colors */
+  --primary: #15803d;
+  --primary-foreground: #ffffff;
+  --secondary: #84cc16;
+  --secondary-foreground: #374151;
+  --accent: #84cc16;
+  --accent-foreground: #374151;
+
+  /* Utility Colors */
+  --muted: #f0fdf4;
+  --muted-foreground: #6b7280;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #374151;
+
+  /* UI Elements */
+  --border: #e5e7eb;
+  --input: #f9fafb;
+  --ring: rgba(21, 128, 61, 0.3);
+  --radius: 0.5rem;
+
+  /* Chart Colors */
+  --chart-1: #15803d;
+  --chart-2: #84cc16;
+  --chart-3: #dc2626;
+  --chart-4: #ea580c;
+  --chart-5: #f59e0b;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #15803d 0%, #84cc16 100%);
+  --gradient-card: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Custom utility classes */
+.gradient-primary {
+  background: var(--gradient-primary);
+}
+
+.gradient-card {
+  background: var(--gradient-card);
+}
+
+.shadow-custom {
+  box-shadow: var(--shadow-lg);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Animation utilities */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Hover effects */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+}
