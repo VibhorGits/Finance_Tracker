@@ -38,7 +38,7 @@ function AccountManager({ accounts = [], onAccountCreated }) {
 
     setIsCreating(true)
     try {
-      await axios.post("http://127.0.0.1:8000/accounts/", {
+      await axios.post(`${import.meta.env.VITE_API_BASE_URL}/accounts/`, {
         account_name: accountName,
         account_type: accountType,
       })
@@ -60,7 +60,7 @@ function AccountManager({ accounts = [], onAccountCreated }) {
 
   const handleSaveEdit = async (accountId) => {
     try {
-      await axios.patch(`http://127.0.0.1:8000/accounts/${accountId}`, {
+      await axios.patch(`${import.meta.env.VITE_API_BASE_URL}/accounts/${accountId}`, {
         account_name: editName,
         account_type: editType,
       })
@@ -75,7 +75,7 @@ function AccountManager({ accounts = [], onAccountCreated }) {
   const handleDeleteAccount = async (accountId) => {
     if (window.confirm("Are you sure you want to delete this account? This action cannot be undone.")) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/accounts/${accountId}`)
+        await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/accounts/${accountId}`)
         onAccountCreated()
       } catch (error) {
         console.error("Error deleting account:", error)

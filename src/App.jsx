@@ -34,9 +34,12 @@ function App() {
   const [activeTab, setActiveTab] = useState("dashboard")
   const [backendAvailable, setBackendAvailable] = useState(false)
 
+  // Use environment variable for API base URL
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/accounts/")
+      const response = await axios.get(`${API_BASE_URL}/accounts/`)
       setAccounts(response.data)
       setBackendAvailable(true)
     } catch (error) {
@@ -55,7 +58,7 @@ function App() {
   useEffect(() => {
     const fetchMessage = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/")
+        const response = await axios.get(`${API_BASE_URL}/`)
         setBackendMessage(response.data.message)
         setBackendAvailable(true)
       } catch (error) {
@@ -72,7 +75,7 @@ function App() {
   useEffect(() => {
     const fetchAndSetAccounts = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/accounts/")
+        const response = await axios.get(`${API_BASE_URL}/accounts/`)
         setAccounts(response.data)
         setBackendAvailable(true)
         if (response.data.length > 0 && viewingAccount === "") {

@@ -17,7 +17,7 @@ function AskAI({ accountId }) {
     setLoading(true)
     setResponse("")
     try {
-      const result = await axios.post(`http://127.0.0.1:8000/analytics/query/${accountId}`, {
+      const result = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/analytics/query/${accountId}`, {
         query: query,
       })
       setResponse(result.data.answer)

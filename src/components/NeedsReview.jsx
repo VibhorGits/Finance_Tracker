@@ -24,7 +24,7 @@ function NeedsReview({ accountId }) {
       if (!accountId) return
       setLoading(true)
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/transactions/review/?account_id=${accountId}`)
+        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/transactions/review/?account_id=${accountId}`)
         const itemsWithCustomState = response.data.map((item) => ({
           ...item,
           showCustomInput: false,
@@ -44,7 +44,7 @@ function NeedsReview({ accountId }) {
 
     setProcessingItems((prev) => new Set(prev).add(transactionId))
     try {
-      await axios.patch(`http://127.0.0.1:8000/transactions/${transactionId}`, {
+      await axios.patch(`${import.meta.env.VITE_API_BASE_URL}/transactions/${transactionId}`, {
         category: newCategory,
       })
       setReviewItems((prevItems) => prevItems.filter((item) => item._id !== transactionId))

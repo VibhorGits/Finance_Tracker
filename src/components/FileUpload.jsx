@@ -52,7 +52,7 @@ function FileUpload({ onUploadSuccess, accounts = [] }) {
     formData.append("account_id", selectedAccount)
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/uploadfile/", formData, {
+      const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/uploadfile/`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },

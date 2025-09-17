@@ -32,7 +32,7 @@ function TransactionTable({ accountId }) {
     const fetchTransactions = async () => {
       setLoading(true)
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/transactions/?account_id=${accountId}`)
+        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/transactions/?account_id=${accountId}`)
         setTransactions(response.data)
         setFilteredTransactions(response.data)
       } catch (error) {

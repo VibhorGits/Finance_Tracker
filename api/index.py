@@ -34,7 +34,8 @@ class TransactionUpdate(BaseModel):
 class AIQuery(BaseModel):
     query: str
 
-genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+print("DEBUG: GOOGLE_API_KEY loaded:", os.getenv("GOOGLE_API_KEY") is not None)
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
 # --- Helper function to extract merchant name from UPI description ---
@@ -136,8 +137,22 @@ class JSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 # --- Database Connection ---
-connection_string = "mongodb+srv://Cluster12390:fU9EeUF7THNx@cluster12390.fzv363x.mongodb.net/?retryWrites=true&w=majority"
-client = MongoClient(connection_string)
+connection_string = os.getenv("MONGO_CONNECTION_STRING")
+print("DEBUG: Attempting to connect to MongoDB...")
+print("DEBUG: MONGO_CONNECTION_STRING loaded:", connection_string is not None)
+if connection_string:
+    print("DEBUG: MONGO_CONNECTION_STRING value:", connection_string[:50] + "..." if len(connection_string) > 50 else connection_string)
+else:
+    print("ERROR: MONGO_CONNECTION_STRING is None - database connection will fail!")
+
+try:
+    client = MongoClient(connection_string)
+    # Test the connection
+    client.admin.command('ping')
+    print("DEBUG: MongoDB connection successful!")
+except Exception as e:
+    print(f"ERROR: MongoDB connection failed: {e}")
+    print("This will cause all database operations to fail!")
 # Select your database (it will be created if it doesn't exist)
 db = client['finance_tracker_db']
 # Select your collection (like a table in SQL)
@@ -150,6 +165,7 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://your-app.vercel.app",  # Replace with your actual Vercel domain
 ]
 
 # Add the middleware to your app
