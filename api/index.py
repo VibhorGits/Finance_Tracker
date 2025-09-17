@@ -191,14 +191,14 @@ app.add_middleware(
 )
 
 # Define a "path operation decorator" for the root URL
-@app.get("/")
+@app.get("/api")
 
 def read_root():
     # This function will run when a user visits the main URL
     return {"message": "Hello from the FastAPI Backend!"}
 
 # Add the endpoint to create a new account
-@app.post("/accounts/")
+@app.post("/api/accounts/")
 def create_account(account: Account):
     # Convert the pydantic model to a dictionary
     account_data = account.dict()
@@ -213,7 +213,7 @@ def create_account(account: Account):
     return {"status": "success", "message": "Account created successfully."}
 
 # Add the endpoint to fetch all accounts
-@app.get("/accounts/")
+@app.get("/api/accounts/")
 def get_accounts():
     if db is None:
         return {"error": "Database connection not available"}
@@ -222,7 +222,7 @@ def get_accounts():
         doc['_id'] = str(doc['_id'])
         accounts.append(doc)
     return accounts
-@app.patch("/accounts/{account_id}")
+@app.patch("/api/accounts/{account_id}")
 def update_account(account_id: str, account: Account):
     # Convert the pydantic model to a dictionary
     account_data = account.dict()
@@ -239,7 +239,7 @@ def update_account(account_id: str, account: Account):
         # If no document was found with that ID, return an error
         return {"status": "error", "message": "Account not found."}
 
-@app.delete("/accounts/{account_id}")
+@app.delete("/api/accounts/{account_id}")
 def delete_account(account_id: str):
     # Delete the account from the 'accounts' collection
     account_result = db.accounts.delete_one({'_id': ObjectId(account_id)})
@@ -255,7 +255,7 @@ def delete_account(account_id: str):
 
 
 # --- Analytics Endpoint ---
-@app.get("/analytics/summary/{account_id}")
+@app.get("/api/analytics/summary/{account_id}")
 def get_analytics_summary(account_id: str):
     if collection is None:
         return {"error": "Database connection not available"}
@@ -316,7 +316,7 @@ def get_analytics_summary(account_id: str):
         }
     
 # ENDPOINT : For the Pie Chart
-@app.get("/analytics/spending_by_category/{account_id}")
+@app.get("/api/analytics/spending_by_category/{account_id}")
 def get_spending_by_category(account_id: str):
     pipeline = [
         {
@@ -347,7 +347,7 @@ def get_spending_by_category(account_id: str):
     return result
 
 # --- "Needs Review" Endpoint ---
-@app.get("/transactions/review/")
+@app.get("/api/transactions/review/")
 def get_transactions_for_review(account_id: Optional[str] = None):
     query = {
         # Use the $in operator to find documents where confidence is either "Medium" or "Low"
@@ -367,7 +367,7 @@ def get_transactions_for_review(account_id: Optional[str] = None):
     return transactions
 
 # Add this new endpoint to fetch all transactions
-@app.get("/transactions/")
+@app.get("/api/transactions/")
 def get_transactions(account_id: Optional[str] = None):
     if collection is None:
         return {"error": "Database connection not available"}
@@ -393,7 +393,7 @@ def get_transactions(account_id: Optional[str] = None):
         transactions.append(doc)
     return transactions
 
-@app.patch("/transactions/{transaction_id}")
+@app.patch("/api/transactions/{transaction_id}")
 def update_transaction_category(transaction_id: str, update_data: TransactionUpdate):
     # Use MongoDB's update_one method to find the document and update it
     result = collection.update_one(
@@ -413,7 +413,7 @@ def update_transaction_category(transaction_id: str, update_data: TransactionUpd
         # If no document was found with that ID, return an error
         return {"status": "error", "message": "Transaction not found."}
 
-@app.post("/uploadfile/")
+@app.post("/api/uploadfile/")
 async def create_upload_file(file: UploadFile = File(...), account_id: str = Form(...)):
     try:
         contents = await file.read()
@@ -491,7 +491,7 @@ async def create_upload_file(file: UploadFile = File(...), account_id: str = For
         traceback.print_exc()
         return {"error": f"Failed to process the CSV file: {str(e)}"}
 
-@app.get("/analytics/subscriptions/{account_id}")
+@app.get("/api/analytics/subscriptions/{account_id}")
 def get_subscriptions(account_id: str):
     # First, fetch all transactions for the account to find the description column
     account_transactions = list(collection.find({'account_id': account_id, 'user_id': 'placeholder_user'}))
@@ -606,7 +606,7 @@ def get_subscriptions(account_id: str):
     return result
 
 # --- Natural Language Query Endpoint ---
-@app.post("/analytics/query/{account_id}")
+@app.post("/api/analytics/query/{account_id}")
 def handle_ai_query(account_id: str, query: AIQuery):
     if collection is None:
         return {"answer": "Database connection not available"}
