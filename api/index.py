@@ -35,8 +35,14 @@ class AIQuery(BaseModel):
     query: str
 
 print("DEBUG: GOOGLE_API_KEY loaded:", os.getenv("GOOGLE_API_KEY") is not None)
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-model = genai.GenerativeModel('models/gemini-2.5-flash')
+# Configure Gemini API only if key is available
+api_key = os.getenv("GOOGLE_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('models/gemini-1.5-flash')  # Use more stable model
+else:
+    model = None
+    print("WARNING: GOOGLE_API_KEY not found - AI features will be disabled")
 
 # --- Helper function to extract merchant name from UPI description ---
 def extract_merchant_from_upi(description):
@@ -145,18 +151,25 @@ if connection_string:
 else:
     print("ERROR: MONGO_CONNECTION_STRING is None - database connection will fail!")
 
-try:
-    client = MongoClient(connection_string)
-    # Test the connection
-    client.admin.command('ping')
-    print("DEBUG: MongoDB connection successful!")
-except Exception as e:
-    print(f"ERROR: MongoDB connection failed: {e}")
-    print("This will cause all database operations to fail!")
-# Select your database (it will be created if it doesn't exist)
-db = client['finance_tracker_db']
-# Select your collection (like a table in SQL)
-collection = db['transactions']
+# Initialize database connection
+db = None
+collection = None
+
+if connection_string:
+    try:
+        client = MongoClient(connection_string)
+        # Test the connection
+        client.admin.command('ping')
+        print("DEBUG: MongoDB connection successful!")
+        # Select your database (it will be created if it doesn't exist)
+        db = client['finance_tracker_db']
+        # Select your collection (like a table in SQL)
+        collection = db['transactions']
+    except Exception as e:
+        print(f"ERROR: MongoDB connection failed: {e}")
+        print("This will cause all database operations to fail!")
+else:
+    print("ERROR: MONGO_CONNECTION_STRING is None - database connection will fail!")
 
 # Create an instance of the FastAPI class
 app = FastAPI()
@@ -194,12 +207,16 @@ def create_account(account: Account):
     account_data['user_id'] = "placeholder_user" 
     
     # Insert the new account into the 'accounts' collection
+    if db is None:
+        return {"status": "error", "message": "Database connection not available"}
     db.accounts.insert_one(account_data)
     return {"status": "success", "message": "Account created successfully."}
 
 # Add the endpoint to fetch all accounts
 @app.get("/accounts/")
 def get_accounts():
+    if db is None:
+        return {"error": "Database connection not available"}
     accounts = []
     for doc in db.accounts.find({"user_id": "placeholder_user"}): # Find only for our placeholder user
         doc['_id'] = str(doc['_id'])
@@ -240,6 +257,9 @@ def delete_account(account_id: str):
 # --- Analytics Endpoint ---
 @app.get("/analytics/summary/{account_id}")
 def get_analytics_summary(account_id: str):
+    if collection is None:
+        return {"error": "Database connection not available"}
+
     # Define the MongoDB Aggregation Pipeline
     pipeline = [
         {
@@ -349,11 +369,14 @@ def get_transactions_for_review(account_id: Optional[str] = None):
 # Add this new endpoint to fetch all transactions
 @app.get("/transactions/")
 def get_transactions(account_id: Optional[str] = None):
+    if collection is None:
+        return {"error": "Database connection not available"}
+
     query = {}
     # If an account_id is provided in the request, add it to our query filter
     if account_id:
         query['account_id'] = account_id
-    
+
     # We can also add the user_id filter to be safe
     query['user_id'] = "placeholder_user"
 
@@ -455,6 +478,8 @@ async def create_upload_file(file: UploadFile = File(...), account_id: str = For
         # Insert into database
         if records:
             print("Sample processed record:", records[0])
+            if collection is None:
+                return {"error": "Database connection not available"}
             collection.insert_many(records)
             return {"message": f"Successfully uploaded and saved {len(records)} transactions."}
         else:
@@ -583,6 +608,9 @@ def get_subscriptions(account_id: str):
 # --- Natural Language Query Endpoint ---
 @app.post("/analytics/query/{account_id}")
 def handle_ai_query(account_id: str, query: AIQuery):
+    if collection is None:
+        return {"answer": "Database connection not available"}
+
     # 1. Fetch relevant transactions to provide context
     # We'll fetch the last 50 transactions for context, you can adjust this number
     transactions = list(collection.find(
@@ -617,6 +645,8 @@ def handle_ai_query(account_id: str, query: AIQuery):
 
     # 4. Send the prompt to the Gemini API
     try:
+        if model is None:
+            return {"answer": "AI features are currently disabled. Please check your GOOGLE_API_KEY configuration."}
         response = model.generate_content(prompt)
         return {"answer": response.text}
     except Exception as e:
