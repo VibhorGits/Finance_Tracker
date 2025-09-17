@@ -4,36 +4,15 @@ import pandas as pd
 from pymongo import MongoClient
 from bson import ObjectId
 from pydantic import BaseModel
-from typing import Optional 
+from typing import Optional
+import google.generativeai as genai
+import os
 import json
 import io, re 
+from dotenv import load_dotenv
 
-# We'll now include a 'type' (direct or regex) for more advanced matching
-# MERCHANT_CATEGORY_MAP = {
-#     # High Confidence (Direct Keywords)
-#     "swiggy": {"category": "Food", "type": "direct"},
-#     "zomato": {"category": "Food", "type": "direct"},
-#     "blinkit": {"category": "Groceries", "type": "direct"},
-#     "zepto": {"category": "Groceries", "type": "direct"},
-#     "amazon": {"category": "Shopping", "type": "direct"},
-#     "flipkart": {"category": "Shopping", "type": "direct"},
-#     "myntra": {"category": "Shopping", "type": "direct"},
-#     "purple": {"category": "Shopping", "type": "direct"},
-#     "uber": {"category": "Transport", "type": "direct"},
-#     "netflix": {"category": "Bills & Subscriptions", "type": "direct"},
-#     "spotify": {"category": "Bills & Subscriptions", "type": "direct"},
-#     "airtel": {"category": "Bills & Subscriptions", "type": "direct"},
-    
-#     # Medium Confidence (Regex Patterns)
-#     # UPI transaction formats for food services
-#     r"\b(?:swiggy|zomato)\b": {"category": "Food", "type": "regex"},
-#     # UPI transaction formats for grocery services
-#     r"\b(?:blinkit|zepto|instamart)\b": {"category": "Groceries", "type": "regex"},
-#     # UPI transaction formats for transport services
-#     r"\b(?:uber|ola|rapido)\b": {"category": "Transport", "type": "regex"},
-#     # UPI transaction formats for shopping services
-#     r"\b(?:flipkart|amazon|myntra)\b": {"category": "Shopping", "type": "regex"},
-# }
+# Load the environment variables from the .env file
+load_dotenv()
 
 MERCHANT_CATEGORY_MAP = {
     # High Confidence (Finds these keywords as whole words anywhere in the description)
@@ -52,22 +31,93 @@ class Account(BaseModel):
 class TransactionUpdate(BaseModel):
     category: str
 
+class AIQuery(BaseModel):
+    query: str
+
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+model = genai.GenerativeModel('models/gemini-2.5-flash')
+
+# --- Helper function to extract merchant name from UPI description ---
+def extract_merchant_from_upi(description):
+    # If it's a UPI transaction, try to extract the merchant name
+    if description.startswith('UPI/'):
+        parts = description.split('/')
+        if len(parts) > 3:
+            # Usually the merchant is in the last part or before @
+            merchant_part = parts[-1]
+            # Remove trailing commas or other artifacts
+            merchant_part = merchant_part.strip(',').strip()
+            # If it contains @, take the part before @
+            if '@' in merchant_part:
+                merchant_part = merchant_part.split('@')[0]
+            return merchant_part
+    return description
+
 # --- Helper function to categorize a single transaction ---
 def categorize_transaction(description):
-    lower_description = description.lower()
-    
+    # First, try to extract a cleaner merchant name if it's UPI
+    clean_description = extract_merchant_from_upi(description)
+    lower_description = clean_description.lower()
+
     # PRIORITY 1: High Confidence (Check for known merchant keywords)
     for pattern, category in MERCHANT_CATEGORY_MAP.items():
         if re.search(pattern, lower_description):
             return category, "High"
-            
+
     # PRIORITY 2: Medium Confidence (We can add rules for transaction types later if needed)
     # For now, this section will be empty.
-            
+
     # PRIORITY 3: Low Confidence (If nothing matches)
     return "Miscellaneous", "Low"
 
-# --- Helper function to find the most likely description column ---
+# --- Helper function to parse date strings robustly ---
+def parse_date(date_str):
+    if pd.isna(date_str) or str(date_str).strip() == '':
+        return ''
+    date_str = str(date_str).strip().rstrip(',')
+    try:
+        dt = pd.to_datetime(date_str, dayfirst=True, errors='raise')
+        return dt.strftime('%Y-%m-%dT%H:%M:%S')
+    except:
+        try:
+            dt = pd.to_datetime(date_str, dayfirst=False, errors='raise')
+            return dt.strftime('%Y-%m-%dT%H:%M:%S')
+        except:
+            return ''
+
+# --- Helper function to detect and map columns to standard names ---
+def detect_and_map_columns(df):
+    columns = df.columns.tolist()
+    mapping = {}
+
+    # Possible column names for each standard field (case insensitive)
+    date_candidates = ['date', 'transaction date', 'txn date']
+    amount_candidates = ['amount', 'txn amount', 'value']
+    description_candidates = ['description', 'narration', 'transaction details', 'particulars', 'notes', 'upi_reference']
+    transaction_type_candidates = ['transaction type', 'type', 'cr/dr', 'dr/cr']
+
+    for col in columns:
+        col_lower = col.lower().strip()
+        if any(candidate in col_lower for candidate in date_candidates) or 'date' in col_lower:
+            mapping['Date'] = col
+        elif any(candidate in col_lower for candidate in amount_candidates) or 'amount' in col_lower:
+            mapping['Amount'] = col
+        elif col_lower in description_candidates:
+            if 'Description' not in mapping:  # Take the first match
+                mapping['Description'] = col
+        elif any(candidate in col_lower for candidate in transaction_type_candidates) or 'type' in col_lower:
+            mapping['Transaction_Type'] = col
+
+    # Special handling: if no Description but UPI_Reference exists, use it
+    if 'Description' not in mapping:
+        for col in columns:
+            if 'upi' in col.lower() or 'reference' in col.lower():
+                mapping['Description'] = col
+                break
+
+    return mapping
+
+# --- Helper function to find the most likely description column (kept for compatibility) ---
 def find_description_column(columns):
     # A list of possible names for the description column, in order of preference
     potential_columns = [
@@ -99,6 +149,7 @@ app = FastAPI()
 # Define the origins that are allowed to make requests
 origins = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 # Add the middleware to your app
@@ -296,52 +347,77 @@ def update_transaction_category(transaction_id: str, update_data: TransactionUpd
 async def create_upload_file(file: UploadFile = File(...), account_id: str = Form(...)):
     try:
         contents = await file.read()
-        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8-sig')))
+        print("Raw df head:\n", df.head().to_string())
         df.columns = [col.strip() for col in df.columns]
+        print("Columns after strip:", df.columns.tolist())
 
-        if 'Amount' in df.columns:
-            df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
+        # Check for column misalignment: if Date column has 'CR'/'DR', shift columns
+        if 'Date' in df.columns and df['Date'].str.upper().isin(['CR', 'DR']).any():
+            df.rename(columns={'Date': 'Transaction Type', 'Transaction Type': 'Amount', 'Amount': 'UPI_Reference', 'UPI_Reference': 'Date'}, inplace=True)
+            print("Columns shifted to fix misalignment")
+            print("Columns after shift:", df.columns.tolist())
+            print("Date values after shift:", df['Date'].tolist()[:5])
 
-        # 2. Handle CR/DR format
-        if 'Transaction Type' in df.columns:
-            df.loc[df['Transaction Type'] == 'DR', 'Amount'] *= -1
+        # Detect column mapping
+        column_mapping = detect_and_map_columns(df)
+        print("Detected column mapping:", column_mapping)
 
-        # 3. Convert 'Date' column to datetime objects, then to a standard ISO string
-        if 'Date' in df.columns:
-            # First, convert to datetime
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-            # Now, convert to a standardized string format that MongoDB can always handle
-            # This also handles any potential NaT (Not a Time) values safely
-            df['Date'] = df['Date'].dt.strftime('%Y-%m-%dT%H:%M:%S').fillna('')
-        
-        description_col = find_description_column(df.columns)
-        if not description_col:
-            return {"error": "Could not find a suitable description column in the CSV."}
-        
-        df.fillna({'Amount': 0}, inplace=True)
+        # Validate required columns
+        required_columns = ['Date', 'Amount', 'Description']
+        missing_columns = [col for col in required_columns if col not in column_mapping]
+        if missing_columns:
+            return {"error": f"Required columns not found: {missing_columns}. Available columns: {df.columns.tolist()}"}
+
+        # Assign mapped columns
+        date_col = column_mapping['Date']
+        amount_col = column_mapping['Amount']
+        description_col = column_mapping['Description']
+        transaction_type_col = column_mapping.get('Transaction_Type')
+
+        # Convert Amount to numeric
+        df[amount_col] = pd.to_numeric(df[amount_col], errors='coerce').fillna(0)
+
+        # Handle CR/DR format if Transaction_Type column exists
+        if transaction_type_col and transaction_type_col in df.columns:
+            df.loc[df[transaction_type_col] == 'DR', amount_col] *= -1
+            print("Applied DR negation based on Transaction_Type")
+
+        # Convert Date column to datetime and standardize
+        if date_col in df.columns:
+            print("Date values before processing:", df[date_col].tolist()[:5])
+            df[date_col] = df[date_col].apply(parse_date)
+            print("Sample dates after processing:", df[date_col].tolist()[:5])
+
+        # Fill NaNs
+        df.fillna({amount_col: 0}, inplace=True)
         df.fillna('', inplace=True)
-            
-        records = df.to_dict('records')
-        
-        for record in records:
+
+        # Process records
+        records = []
+        for record in df.to_dict('records'):
             record['account_id'] = account_id
             record['user_id'] = "placeholder_user"
             description = str(record.get(description_col, ''))
+            record['Description'] = description
             category, confidence = categorize_transaction(description)
             record['category'] = category
             record['confidence'] = confidence
+            records.append(record)
 
-        # --- ADD SPECIFIC ERROR LOGGING FOR DATABASE INSERTION ---
+        # Insert into database
         if records:
+            print("Sample processed record:", records[0])
             collection.insert_many(records)
             return {"message": f"Successfully uploaded and saved {len(records)} transactions."}
         else:
             return {"error": "No records to save."}
 
     except Exception as e:
-        # This will catch any other errors during parsing
         print(f"FILE PROCESSING FAILED: {e}")
-        return {"error": "Failed to process the CSV file."}
+        import traceback
+        traceback.print_exc()
+        return {"error": f"Failed to process the CSV file: {str(e)}"}
 
 @app.get("/analytics/subscriptions/{account_id}")
 def get_subscriptions(account_id: str):
@@ -366,7 +442,13 @@ def get_subscriptions(account_id: str):
                 'Amount': {'$lt': 0}
             }
         },
-        # Stage 2: Normalize the merchant name for better grouping
+        # Stage 2: Filter out transactions with invalid dates
+        {
+            '$match': {
+                'Date': {'$ne': ''}
+            }
+        },
+        # Stage 3: Normalize the merchant name for better grouping
         {
             '$addFields': {
                 'normalized_merchant': {
@@ -380,11 +462,11 @@ def get_subscriptions(account_id: str):
                 }
             }
         },
-        # Stage 3: Sort by merchant and date to prepare for grouping
+        # Stage 4: Sort by merchant and date to prepare for grouping
         {
             '$sort': {'normalized_merchant': 1, 'Date': 1}
         },
-        # Stage 4: Group transactions by the normalized merchant
+        # Stage 5: Group transactions by the normalized merchant
         {
             '$group': {
                 '_id': '$normalized_merchant',
@@ -397,19 +479,19 @@ def get_subscriptions(account_id: str):
                 'count': {'$sum': 1}
             }
         },
-        # Stage 5: Filter for merchants with 2 or more transactions
+        # Stage 6: Filter for merchants with 2 or more transactions
         {
             '$match': {'count': {'$gte': 2}}
         },
 
-        # Stage 6: Calculate the standard deviation of the amounts. A low value means the amounts are very similar.
+        # Stage 7: Calculate the standard deviation of the amounts. A low value means the amounts are very similar.
         {
             '$addFields': {
                 'amount_std_dev': {'$stdDevPop': '$transactions.amount'}
             }
         },
 
-        # Stage 7: Calculate the time difference in days between consecutive transactions
+        # Stage 8: Calculate the time difference in days between consecutive transactions
         {
             '$addFields': {
                 'time_diffs_days': {
@@ -429,14 +511,14 @@ def get_subscriptions(account_id: str):
                 }
             }
         },
-        # Stage 8: Filter for recurring patterns (e.g., transactions every 28-31 days)
+        # Stage 9: Filter for recurring patterns (e.g., transactions every 28-31 days)
         {
             '$match': {
                 'time_diffs_days': {'$elemMatch': {'$gte': 28, '$lte': 31}},
                 'amount_std_dev': {'$lte': 5.0} # Allow for a very small variance in amount (e.g., a few rupees/cents)
             }
         },
-        # Stage 9: Project to a clean output format
+        # Stage 10: Project to a clean output format
         {
             '$project': {
                 '_id': 0,
@@ -450,3 +532,46 @@ def get_subscriptions(account_id: str):
 
     result = list(collection.aggregate(pipeline))
     return result
+
+# --- Natural Language Query Endpoint ---
+@app.post("/analytics/query/{account_id}")
+def handle_ai_query(account_id: str, query: AIQuery):
+    # 1. Fetch relevant transactions to provide context
+    # We'll fetch the last 50 transactions for context, you can adjust this number
+    transactions = list(collection.find(
+        {'account_id': account_id, 'user_id': 'placeholder_user'},
+        sort=[('Date', -1)],
+        limit=20
+    ))
+
+    if not transactions:
+        return {"answer": "I couldn't find any transactions for this account to analyze."}
+
+    # 2. Prepare the data for the prompt by converting it to a simple string format
+    transaction_context = ""
+    for t in transactions:
+        # Convert ObjectId to string and handle potential missing keys
+        t['_id'] = str(t.get('_id'))
+        date_str = t.get('Date', 'N/A')
+        desc_str = t.get('Transaction details') or t.get('description') or t.get('UPI_Reference', 'N/A')
+        amount_str = f"{t.get('Amount', 0):.2f}"
+        cat_str = t.get('category', 'N/A')
+        transaction_context += f"- Date: {date_str}, Description: {desc_str}, Amount: {amount_str}, Category: {cat_str}\n"
+
+    # 3. Create a detailed prompt for the LLM
+    prompt = f"""
+    You are a helpful personal finance assistant. Analyze the following list of transactions and answer the user's question based ONLY on this data. Do not make up information. Provide a concise, helpful answer.
+
+    Here are the user's transactions:
+    {transaction_context}
+
+    User's Question: "{query.query}"
+    """
+
+    # 4. Send the prompt to the Gemini API
+    try:
+        response = model.generate_content(prompt)
+        return {"answer": response.text}
+    except Exception as e:
+        print(f"Error calling Gemini API: {e}")
+        return {"answer": "Sorry, I encountered an error while analyzing your question."}

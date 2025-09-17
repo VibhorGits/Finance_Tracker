@@ -8,7 +8,9 @@ import FileUpload from "./components/FileUpload.jsx";
 import AccountManager from "./components/AccountManager";
 import TransactionTable from "./components/TransactionTable";
 import NeedsReview from "./components/NeedsReview";
+import SubscriptionList from "./components/SubscriptionList";
 import Modal from "./components/Modal";
+import AskAI from './components/AskAI';
 
 function App() {
   const [fileUploadCount, setFileUploadCount] = useState(0);
@@ -121,6 +123,25 @@ function App() {
             >
               Needs Review
             </button>
+            <button
+              onClick={() => setActiveTab("subscriptions")}
+              className={`font-medium ${
+                activeTab === "subscriptions"
+                  ? "text-blue-600"
+                  : "text-gray-600 hover:text-blue-500"
+              }`}
+            >
+              Subscriptions
+            </button>
+          </nav>
+          <nav className="space-x-6">
+            {/* ... (Dashboard, Accounts, Transactions, Needs Review buttons) ... */}
+            <button
+              onClick={() => setActiveTab('ask_ai')}
+              className={`font-medium ${activeTab === 'ask_ai' ? 'text-blue-600' : 'text-gray-600 hover:text-blue-500'}`}
+            >
+              Ask AI
+            </button>
           </nav>
         </header>
 
@@ -188,6 +209,40 @@ function App() {
 
           {/* Needs Review View */}
           {activeTab === "review" && <NeedsReview accountId={viewingAccount} />}
+
+          {/* Subscriptions View */}
+          {activeTab === "subscriptions" && (
+            <>
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                <label
+                  htmlFor="subscriptions-account-select"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Viewing Subscriptions for Account:
+                </label>
+                <select
+                  id="subscriptions-account-select"
+                  value={viewingAccount}
+                  onChange={(e) => setViewingAccount(e.target.value)}
+                  className="block w-full p-2 border border-gray-300 rounded-md"
+                >
+                  {accounts.map((acc) => (
+                    <option key={acc._id} value={acc._id}>
+                      {acc.account_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <SubscriptionList
+                key={`${viewingAccount}-subscriptions`}
+                accountId={viewingAccount}
+              />
+            </>
+          )}
+           {/* Ask AI View */}
+          {activeTab === 'ask_ai' && (
+            <AskAI accountId={viewingAccount} />
+          )}
         </div>
 
         <Modal
