@@ -2,7 +2,23 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "excludeFiles": [
+          "api/src/**",
+          "api/venv/**",
+          "api/.venv/**",
+          "api/env/**",
+          "api/ENV/**",
+          "**/*.log",
+          "**/.DS_Store",
+          "**/__pycache__/**",
+          "**/*.pyc",
+          "**/*.so",
+          "**/*.dylib",
+          "**/*.pyd"
+        ]
+      }
     },
     {
       "src": "package.json",

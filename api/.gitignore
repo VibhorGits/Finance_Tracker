@@ -1,4 +1,13 @@
 __pycache__/
 *.pyc
 venv/
+.venv/
+env/
+.venv/
+ENV/
 .env
+src/
+*.log
+.DS_Store
+*.so
+*.dylib
