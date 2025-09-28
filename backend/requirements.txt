@@ -1,9 +1,9 @@
 fastapi
 pandas
 pymongo
-bson
 pydantic
 google-generativeai
 python-dotenv
 uvicorn
 gunicorn
+python-multipart
