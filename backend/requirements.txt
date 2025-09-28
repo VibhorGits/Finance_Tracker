@@ -1,0 +1,8 @@
+fastapi
+pandas
+pymongo
+bson
+pydantic
+typing
+google-generativeai
+python-dotenv
