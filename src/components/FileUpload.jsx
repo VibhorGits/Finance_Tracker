@@ -52,7 +52,7 @@ function FileUpload({ onUploadSuccess, accounts = [] }) {
     formData.append("account_id", selectedAccount)
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/uploadfile/", formData, {
+      const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/uploadfile/`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -156,7 +156,7 @@ function FileUpload({ onUploadSuccess, accounts = [] }) {
         <label className="block text-sm font-semibold text-gray-700">Upload Transaction File</label>
 
         <div
-          className={`relative border-2 border-dashed rounded-2xl transition-all duration-200 ${
+          className={`relative border-2 border-dashed rounded to-2xl transition-all duration-200 ${
             dragActive
               ? "border-green-400 bg-green-50"
               : uploadStatus === "success"

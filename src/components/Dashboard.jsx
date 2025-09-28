@@ -33,8 +33,8 @@ function Dashboard({ accountId }) {
       setLoading(true)
       setError(null)
       try {
-        const summaryRes = axios.get(`http://127.0.0.1:8000/analytics/summary/${accountId}`)
-        const categoryRes = axios.get(`http://127.0.0.1:8000/analytics/spending_by_category/${accountId}`)
+        const summaryRes = axios.get(`${import.meta.env.VITE_API_BASE_URL}/analytics/summary/${accountId}`)
+        const categoryRes = axios.get(`${import.meta.env.VITE_API_BASE_URL}/analytics/spending_by_category/${accountId}`)
 
         const [summaryData, categoryChartData] = await Promise.all([summaryRes, categoryRes])
 

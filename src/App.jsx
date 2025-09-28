@@ -36,7 +36,7 @@ function App() {
 
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/accounts/")
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/accounts/`)
       setAccounts(response.data)
       setBackendAvailable(true)
     } catch (error) {
@@ -55,7 +55,7 @@ function App() {
   useEffect(() => {
     const fetchMessage = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/")
+        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/`)
         setBackendMessage(response.data.message)
         setBackendAvailable(true)
       } catch (error) {
@@ -72,7 +72,7 @@ function App() {
   useEffect(() => {
     const fetchAndSetAccounts = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/accounts/")
+        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/accounts/`)
         setAccounts(response.data)
         setBackendAvailable(true)
         if (response.data.length > 0 && viewingAccount === "") {
@@ -97,7 +97,7 @@ function App() {
           </div>
           <div className="ml-3">
             <p className="text-sm text-amber-700">
-              <strong>Backend Offline:</strong> The FastAPI backend at <code>http://127.0.0.1:8000</code> is not
+              <strong>Backend Offline:</strong> The FastAPI backend at <code>{import.meta.env.VITE_API_BASE_URL}</code> is not
               running. Start your backend server to enable full functionality.
             </p>
           </div>

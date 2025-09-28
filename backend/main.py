@@ -136,21 +136,18 @@ class JSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 # --- Database Connection ---
-connection_string = "mongodb+srv://Cluster12390:fU9EeUF7THNx@cluster12390.fzv363x.mongodb.net/?retryWrites=true&w=majority"
+connection_string = os.environ.get("MONGO_CONNECTION_STRING")
 client = MongoClient(connection_string)
-# Select your database (it will be created if it doesn't exist)
-db = client['finance_tracker_db']
-# Select your collection (like a table in SQL)
-collection = db['transactions']
+db_name = os.environ.get("MONGO_DB_NAME", "finance_tracker_db")
+collection_name = os.environ.get("MONGO_COLLECTION_NAME", "transactions")
+db = client[db_name]
+collection = db[collection_name]
 
 # Create an instance of the FastAPI class
 app = FastAPI()
 
 # Define the origins that are allowed to make requests
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(',')
 
 # Add the middleware to your app
 app.add_middleware(
@@ -174,8 +171,7 @@ def create_account(account: Account):
     account_data = account.dict()
     # For now, we'll add a placeholder user_id
     # We will replace this with a real one when we add authentication
-    account_data['user_id'] = "placeholder_user" 
-    
+    account_data['user_id'] = os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user") 
     # Insert the new account into the 'accounts' collection
     db.accounts.insert_one(account_data)
     return {"status": "success", "message": "Account created successfully."}
@@ -184,7 +180,8 @@ def create_account(account: Account):
 @app.get("/accounts/")
 def get_accounts():
     accounts = []
-    for doc in db.accounts.find({"user_id": "placeholder_user"}): # Find only for our placeholder user
+    user_id = os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")
+    for doc in db.accounts.find({"user_id": user_id}): # Find only for our placeholder user
         doc['_id'] = str(doc['_id'])
         accounts.append(doc)
     return accounts
@@ -192,11 +189,11 @@ def get_accounts():
 @app.patch("/accounts/{account_id}")
 def update_account(account_id: str, account: Account):
     # Find the account by ID and update it
+    user_id = os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")
     result = db.accounts.update_one(
-        {"_id": ObjectId(account_id), "user_id": "placeholder_user"},
+        {"_id": ObjectId(account_id), "user_id": user_id},
         {"$set": account.dict()}
     )
-    
     if result.modified_count == 1:
         return {"status": "success", "message": "Account updated successfully."}
     else:
@@ -205,10 +202,10 @@ def update_account(account_id: str, account: Account):
 @app.delete("/accounts/{account_id}")
 def delete_account(account_id: str):
     # Find the account by ID and delete it
+    user_id = os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")
     result = db.accounts.delete_one(
-        {"_id": ObjectId(account_id), "user_id": "placeholder_user"}
+        {"_id": ObjectId(account_id), "user_id": user_id}
     )
-    
     if result.deleted_count == 1:
         return {"status": "success", "message": "Account deleted successfully."}
     else:
@@ -223,7 +220,7 @@ def get_analytics_summary(account_id: str):
             # Stage 1: Match documents for the specified account and user
             '$match': {
                 'account_id': account_id,
-                'user_id': 'placeholder_user'
+                'user_id': os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")
             }
         },
         {
@@ -271,7 +268,7 @@ def get_analytics_summary(account_id: str):
             "net_cash_flow": 0,
             "transaction_count": 0
         }
-    
+
 # ENDPOINT : For the Pie Chart
 @app.get("/analytics/spending_by_category/{account_id}")
 def get_spending_by_category(account_id: str):
@@ -280,7 +277,7 @@ def get_spending_by_category(account_id: str):
             # Stage 1: Match only expenses for the specified account
             '$match': {
                 'account_id': account_id,
-                'user_id': 'placeholder_user',
+                'user_id': os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user"),
                 'Amount': {'$lt': 0} # Filter for expenses only
             }
         },
@@ -309,18 +306,15 @@ def get_transactions_for_review(account_id: Optional[str] = None):
     query = {
         # Use the $in operator to find documents where confidence is either "Medium" or "Low"
         'confidence': {'$in': ["Medium", "Low"]},
-        'user_id': 'placeholder_user'
+        'user_id': os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")
     }
-    
     # If an account_id is provided, add it to the filter
     if account_id:
         query['account_id'] = account_id
-    
     transactions = []
     for doc in collection.find(query):
         doc['_id'] = str(doc['_id'])
         transactions.append(doc)
-    
     return transactions
 
 # Add this new endpoint to fetch all transactions
@@ -330,10 +324,8 @@ def get_transactions(account_id: Optional[str] = None):
     # If an account_id is provided in the request, add it to our query filter
     if account_id:
         query['account_id'] = account_id
-    
     # We can also add the user_id filter to be safe
-    query['user_id'] = "placeholder_user"
-
+    query['user_id'] = os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")
     transactions = []
     # Find all documents in the collection
     for doc in collection.find(query):
@@ -341,7 +333,6 @@ def get_transactions(account_id: Optional[str] = None):
             # A simple check for NaN, which is common from pandas
             if isinstance(value, float) and value != value: # Check for NaN
                 doc[key] = None # Convert NaN to None (which becomes null in JSON)
-                
         # Convert the ObjectId to a string so it can be sent as JSON
         doc['_id'] = str(doc['_id'])
         transactions.append(doc)
@@ -359,7 +350,6 @@ def update_transaction_category(transaction_id: str, update_data: TransactionUpd
             }
         }
     )
-
     # Check if a document was successfully updated
     if result.modified_count == 1:
         return {"status": "success", "message": "Transaction updated successfully."}
@@ -421,7 +411,7 @@ async def create_upload_file(file: UploadFile = File(...), account_id: str = For
         records = []
         for record in df.to_dict('records'):
             record['account_id'] = account_id
-            record['user_id'] = "placeholder_user"
+            record['user_id'] = os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")
             description = str(record.get(description_col, ''))
             record['Description'] = description
             category, confidence = categorize_transaction(description)
@@ -446,7 +436,7 @@ async def create_upload_file(file: UploadFile = File(...), account_id: str = For
 @app.get("/analytics/subscriptions/{account_id}")
 def get_subscriptions(account_id: str):
     # First, fetch all transactions for the account to find the description column
-    account_transactions = list(collection.find({'account_id': account_id, 'user_id': 'placeholder_user'}))
+    account_transactions = list(collection.find({'account_id': account_id, 'user_id': os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")}))
     if not account_transactions:
         return []
     
@@ -462,7 +452,7 @@ def get_subscriptions(account_id: str):
         {
             '$match': {
                 'account_id': account_id,
-                'user_id': 'placeholder_user',
+                'user_id': os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user"),
                 'Amount': {'$lt': 0}
             }
         },
@@ -563,7 +553,7 @@ def handle_ai_query(account_id: str, query: AIQuery):
     # 1. Fetch relevant transactions to provide context
     # We'll fetch the last 50 transactions for context, you can adjust this number
     transactions = list(collection.find(
-        {'account_id': account_id, 'user_id': 'placeholder_user'},
+        {'account_id': account_id, 'user_id': os.environ.get("PLACEHOLDER_USER_ID", "placeholder_user")},
         sort=[('Date', -1)],
         limit=20
     ))
