@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from pymongo import MongoClient
@@ -163,7 +163,6 @@ app.add_middleware(
 
 # Define a "path operation decorator" for the root URL
 @app.get("/")
-
 def read_root():
     # This function will run when a user visits the main URL
     return {"message": "Hello from the FastAPI Backend!"}
@@ -189,6 +188,31 @@ def get_accounts():
         doc['_id'] = str(doc['_id'])
         accounts.append(doc)
     return accounts
+
+@app.patch("/accounts/{account_id}")
+def update_account(account_id: str, account: Account):
+    # Find the account by ID and update it
+    result = db.accounts.update_one(
+        {"_id": ObjectId(account_id), "user_id": "placeholder_user"},
+        {"$set": account.dict()}
+    )
+    
+    if result.modified_count == 1:
+        return {"status": "success", "message": "Account updated successfully."}
+    else:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+@app.delete("/accounts/{account_id}")
+def delete_account(account_id: str):
+    # Find the account by ID and delete it
+    result = db.accounts.delete_one(
+        {"_id": ObjectId(account_id), "user_id": "placeholder_user"}
+    )
+    
+    if result.deleted_count == 1:
+        return {"status": "success", "message": "Account deleted successfully."}
+    else:
+        raise HTTPException(status_code=404, detail="Account not found.")
 
 # --- Analytics Endpoint ---
 @app.get("/analytics/summary/{account_id}")

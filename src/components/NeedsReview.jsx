@@ -1,110 +1,248 @@
-// src/components/NeedsReview.jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+"use client"
 
-const CATEGORY_OPTIONS = ["Food", "Groceries", "Shopping", "Transport", "Travel", "Bills & Subscriptions", "Miscellaneous"];
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { AlertCircle, Check, X, Clock, DollarSign } from "lucide-react"
+
+const CATEGORY_OPTIONS = [
+  "Food",
+  "Groceries",
+  "Shopping",
+  "Transport",
+  "Travel",
+  "Bills & Subscriptions",
+  "Miscellaneous",
+]
 
 function NeedsReview({ accountId }) {
-  const [reviewItems, setReviewItems] = useState([]);
+  const [reviewItems, setReviewItems] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [processingItems, setProcessingItems] = useState(new Set())
 
-  // Fetch data when the component loads or the accountId changes
   useEffect(() => {
     const fetchReviewItems = async () => {
-      if (!accountId) return;
+      if (!accountId) return
+      setLoading(true)
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/transactions/review/?account_id=${accountId}`);
-        // Add a temporary state to each item for handling custom input
-        const itemsWithCustomState = response.data.map(item => ({
+        const response = await axios.get(`http://127.0.0.1:8000/transactions/review/?account_id=${accountId}`)
+        const itemsWithCustomState = response.data.map((item) => ({
           ...item,
           showCustomInput: false,
-          customCategory: ''
-        }));
-        setReviewItems(itemsWithCustomState);
+          customCategory: "",
+        }))
+        setReviewItems(itemsWithCustomState)
       } catch (error) {
-        console.error("Error fetching items for review:", error);
+        console.error("Error fetching items for review:", error)
       }
-    };
-    fetchReviewItems();
-  }, [accountId]);
+      setLoading(false)
+    }
+    fetchReviewItems()
+  }, [accountId])
 
-  // Function to handle the category update
   const handleCategoryUpdate = async (transactionId, newCategory) => {
-    if (!newCategory) return; // Don't do anything if the new category is empty
+    if (!newCategory) return
+
+    setProcessingItems((prev) => new Set(prev).add(transactionId))
     try {
       await axios.patch(`http://127.0.0.1:8000/transactions/${transactionId}`, {
         category: newCategory,
-      });
-      // After a successful update, remove the item from the list
-      setReviewItems(prevItems => prevItems.filter(item => item._id !== transactionId));
+      })
+      setReviewItems((prevItems) => prevItems.filter((item) => item._id !== transactionId))
     } catch (error) {
-      console.error("Error updating transaction:", error);
+      console.error("Error updating transaction:", error)
+      alert("Failed to update transaction. Please try again.")
     }
-  };
-  
-  // Function to handle changes from the dropdown
+    setProcessingItems((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(transactionId)
+      return newSet
+    })
+  }
+
   const handleSelectChange = (transactionId, selectedValue) => {
     if (selectedValue === "add_new") {
-      // If user selects "Add New", show the custom input field
-      setReviewItems(prevItems => prevItems.map(item =>
-        item._id === transactionId ? { ...item, showCustomInput: true } : item
-      ));
+      setReviewItems((prevItems) =>
+        prevItems.map((item) => (item._id === transactionId ? { ...item, showCustomInput: true } : item)),
+      )
     } else {
-      // Otherwise, update the category immediately
-      handleCategoryUpdate(transactionId, selectedValue);
+      handleCategoryUpdate(transactionId, selectedValue)
     }
-  };
+  }
+
+  const getConfidenceColor = (confidence) => {
+    switch (confidence?.toLowerCase()) {
+      case "high":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "low":
+        return "bg-red-100 text-red-800 border-red-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
+
+  const formatAmount = (amount) => {
+    const num = Number.parseFloat(amount) || 0
+    return num < 0 ? `-₹${Math.abs(num).toFixed(2)}` : `₹${num.toFixed(2)}`
+  }
+
+  const getAmountColor = (amount) => {
+    const num = Number.parseFloat(amount) || 0
+    return num < 0 ? "text-red-600" : "text-green-600"
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white/70 backdrop-blur-sm p-8 rounded-2xl border border-gray-200/50 shadow-sm">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 bg-gray-200 rounded w-1/3"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-24 bg-gray-200 rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-xl font-semibold text-gray-700 mb-4">Transactions to Review</h3>
+    <div className="bg-white/70 backdrop-blur-sm p-8 rounded-2xl border border-gray-200/50 shadow-sm">
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+          <AlertCircle className="w-5 h-5 text-amber-600" />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">Transactions to Review</h3>
+          <p className="text-gray-600 text-sm">{reviewItems.length} transactions need categorization</p>
+        </div>
+      </div>
+
       {reviewItems.length === 0 ? (
-        <p className="text-gray-500">No transactions are currently pending review.</p>
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+            <Check className="w-8 h-8 text-green-600" />
+          </div>
+          <h4 className="text-lg font-medium text-gray-900 mb-2">All caught up!</h4>
+          <p className="text-gray-600">No transactions are currently pending review.</p>
+        </div>
       ) : (
-        <ul className="space-y-4">
-          {reviewItems.map(item => (
-            <li key={item._id} className="p-4 border rounded-md">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                <div>
-                  <p className="font-medium text-gray-800">{item['Transaction details'] || item.Description}</p>
-                  <p className="text-sm text-gray-500">Current Category: {item.category} ({item.confidence})</p>
+        <div className="space-y-4">
+          {reviewItems.map((item) => {
+            const isProcessing = processingItems.has(item._id)
+
+            return (
+              <div
+                key={item._id}
+                className={`bg-gradient-to-r from-white to-gray-50/50 p-6 rounded-2xl border border-gray-200/50 transition-all duration-200 ${
+                  isProcessing ? "opacity-50" : "hover-lift"
+                }`}
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  {/* Transaction Info */}
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-lg">
+                          {item["Transaction details"] || item.Description || "No Description"}
+                        </h4>
+                        <div className="flex items-center space-x-4 mt-2">
+                          <div className="flex items-center space-x-1 text-gray-600">
+                            <Clock className="w-4 h-4" />
+                            <span className="text-sm">{item.Date || item.Timestamp || "N/A"}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <DollarSign className="w-4 h-4 text-gray-600" />
+                            <span className={`text-sm font-semibold ${getAmountColor(item.Amount)}`}>
+                              {formatAmount(item.Amount)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm text-gray-600">Current:</span>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getConfidenceColor(
+                          item.confidence,
+                        )}`}
+                      >
+                        {item.category} ({item.confidence})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Section */}
+                  <div className="lg:w-80">
+                    {item.showCustomInput ? (
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          placeholder="Enter custom category"
+                          value={item.customCategory}
+                          onChange={(e) =>
+                            setReviewItems((prevItems) =>
+                              prevItems.map((i) => (i._id === item._id ? { ...i, customCategory: e.target.value } : i)),
+                            )
+                          }
+                          className="w-full p-3 border border-gray-200 rounded-xl bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200"
+                          disabled={isProcessing}
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleCategoryUpdate(item._id, item.customCategory)}
+                            disabled={isProcessing || !item.customCategory}
+                            className="flex-1 bg-green-500 text-white font-semibold py-2 px-4 rounded-xl hover:bg-green-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>Save</span>
+                          </button>
+                          <button
+                            onClick={() =>
+                              setReviewItems((prevItems) =>
+                                prevItems.map((i) =>
+                                  i._id === item._id ? { ...i, showCustomInput: false, customCategory: "" } : i,
+                                ),
+                              )
+                            }
+                            disabled={isProcessing}
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all duration-200 disabled:opacity-50"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <select
+                          onChange={(e) => handleSelectChange(item._id, e.target.value)}
+                          value=""
+                          disabled={isProcessing}
+                          className="w-full p-3 border border-gray-200 rounded-xl bg-white/50 backdrop-blur-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 disabled:opacity-50"
+                        >
+                          <option value="" disabled>
+                            {isProcessing ? "Processing..." : "Re-categorize..."}
+                          </option>
+                          {CATEGORY_OPTIONS.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                          <option value="add_new">-- Add New Category --</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <select
-                  onChange={(e) => handleSelectChange(item._id, e.target.value)}
-                  value="" // Keep dropdown selection empty
-                  className="mt-2 sm:mt-0 sm:ml-4 p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="" disabled>Re-categorize...</option>
-                  {CATEGORY_OPTIONS.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                  <option value="add_new">-- Add New Category --</option>
-                </select>
               </div>
-              {/* Conditionally render the custom category input field */}
-              {item.showCustomInput && (
-                <div className="mt-4 flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Enter custom category"
-                    className="flex-grow p-2 border border-gray-300 rounded-md"
-                    onChange={(e) => setReviewItems(prevItems => prevItems.map(i =>
-                      i._id === item._id ? { ...i, customCategory: e.target.value } : i
-                    ))}
-                  />
-                  <button
-                    onClick={() => handleCategoryUpdate(item._id, item.customCategory)}
-                    className="bg-blue-500 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-600"
-                  >
-                    Save
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+            )
+          })}
+        </div>
       )}
     </div>
-  );
+  )
 }
 
-export default NeedsReview;
+export default NeedsReview
